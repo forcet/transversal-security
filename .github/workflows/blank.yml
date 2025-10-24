@@ -30,6 +30,18 @@ jobs:
           curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar xz
           sudo mv oc /usr/local/bin/
           oc version
+      
+      - name: Verificar secreto OPENSHIFT_TOKEN sin exponerlo
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+        run: |
+          if [ -z "$OPENSHIFT_TOKEN" ]; then
+            echo "ERROR: OPENSHIFT_TOKEN no está definido o está vacío."
+            exit 1
+          fi
+          echo "::add-mask::$OPENSHIFT_TOKEN"  # asegura que se oculte si se imprime por error
+          echo "Longitud del token: ${#OPENSHIFT_TOKEN} caracteres"
+          echo -n "$OPENSHIFT_TOKEN" | sha256sum | awk '{print "sha256(token) = "$1}'
           
       - name: Log in Openshift
         uses: redhat-actions/oc-login@v1
@@ -44,4 +56,5 @@ jobs:
           oc rollout status deployment/forcet-deployment
 
       - name: End
-        run: Si llego aquí es que finalizo, cierto!!
+        run: | 
+          echo "Si llego aquí es que finalizo, cierto!!"
