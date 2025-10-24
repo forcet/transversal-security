@@ -52,46 +52,62 @@ jobs:
           echo "::add-mask::$CLEAN_TOKEN"
           echo "Longitud saneada: ${#CLEAN_TOKEN}"
 
-      - name: Inspeccionar JWT (sin exponer token)
-        shell: bash
+      - name: Validar JWT (formato, exp, aud, sub) sin exponerlo
         run: |
           set -euo pipefail
-          tok="$OPENSHIFT_TOKEN_STRIPPED"
-          if [[ "$tok" != *.*.* ]]; then
-            echo "ERROR: El token no tiene formato JWT (header.payload.signature). ¿pegaste un token viejo/base64?"
-            exit 1
-          fi
-          IFS='.' read -r H P S <<< "$tok"
-          decode() { python - << 'PY'
-      import sys,base64,json,time
-      d=sys.stdin.read().strip().replace('-','+').replace('_','/')
-      pad='='*((4-len(d)%4)%4)
-      try:
-        j=json.loads(base64.b64decode(d+pad).decode('utf-8','ignore'))
-        print(json.dumps(j, indent=2, ensure_ascii=False))
-      except Exception as e:
-        print("<<no se pudo decodificar>>")
-      PY
-      }
-          echo "JWT header:";   printf '%s' "$H" | decode
-          echo "JWT payload:";  printf '%s' "$P" | decode | tee payload.json
-          # Extra: mostrar aud/exp/sub y cuánto falta para expirar
-          AUD=$(jq -r '.aud // empty' payload.json || true)
-          SUB=$(jq -r '.sub // empty' payload.json || true)
-          EXP=$(jq -r '.exp // empty' payload.json || true)
-          NOW=$(date +%s)
-          if [[ -n "$EXP" ]]; then
-            LEFT=$(( EXP - NOW ))
-            echo "exp: $EXP (faltan ${LEFT}s)"
-            if (( LEFT <= 0 )); then
-              echo "ERROR: El token está EXPIRADO."
-              exit 1
-            fi
-          else
-            echo "ADVERTENCIA: payload sin 'exp'"
-          fi
-          echo "aud: ${AUD:-<vacío>}"
-          echo "sub: ${SUB:-<vacío>}"
+          python3 - "$OPENSHIFT_TOKEN_STRIPPED" <<- 'PY'
+            import sys, json, base64, time
+            tok = sys.argv[1]
+
+            parts = tok.split('.')
+            if len(parts) != 3:
+                print("ERROR: el token no tiene formato JWT (header.payload.signature)")
+                sys.exit(1)
+            h, p, s = parts
+
+            def b64url_decode(x: str) -> str:
+                x += "=" * (-len(x) % 4)
+                return base64.urlsafe_b64decode(x.encode()).decode("utf-8", "ignore")
+
+            try:
+                header  = json.loads(b64url_decode(h))
+                payload = json.loads(b64url_decode(p))
+            except Exception as e:
+                print("ERROR: no se pudo decodificar header/payload:", e)
+                sys.exit(1)
+
+            print("JWT header:", json.dumps(header, ensure_ascii=False, indent=2))
+            print("JWT payload:", json.dumps(payload, ensure_ascii=False, indent=2))
+
+            now = int(time.time())
+            exp = payload.get("exp")
+            if exp is not None:
+                left = exp - now
+                print(f"exp: {exp} (restan {left} s)")
+                if left <= 0:
+                    print("ERROR: token EXPIRADO")
+                    sys.exit(2)
+            else:
+                print("ADVERTENCIA: payload sin 'exp'")
+
+            aud = payload.get("aud")
+            ok_aud = False
+            if isinstance(aud, list):
+                ok_aud = ("openshift" in aud) or ("https://kubernetes.default.svc" in aud)
+            else:
+                ok_aud = aud in ("openshift", "https://kubernetes.default.svc")
+            print("aud válida?:", ok_aud, "| aud:", aud)
+
+            expected_ns = "forcet22-dev"
+            expected_sa = "cicd-forcet"
+            sub = payload.get("sub")
+            if sub != f"system:serviceaccount:{expected_ns}:{expected_sa}":
+                print("ADVERTENCIA: sub no coincide con SA/NS esperado:", sub)
+
+            # 6) Resultado “a priori”
+            if (exp is None or exp > now) and ok_aud:
+                print("JWT válido a priori (no expirado y con audiencia aceptable).")
+          PY
 
       - name: Probar oc login directo (debug)
         run: |
