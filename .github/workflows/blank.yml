@@ -55,14 +55,14 @@ jobs:
       - name: Probar oc login directo (debug)
         run: |
           oc version
-          oc login --token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ik44bmJtRDBQX3AwVG9JMm1rSVZBZUNScHdjbVRfUzM3cGR3RXJwZnFibjQifQ.eyJhdWQiOlsiaHR0cHM6Ly9vaWRjLm9wMS5vcGVuc2hpZnRhcHBzLmNvbS8yZmVnZ2V2bDRnbThoa2MxZXNuN3VkcXY2ZW9qcTRpaCJdLCJleHAiOjIwNzY3MDEyNDIsImlhdCI6MTc2MTM0MTI0MiwiaXNzIjoiaHR0cHM6Ly9vaWRjLm9wMS5vcGVuc2hpZnRhcHBzLmNvbS8yZmVnZ2V2bDRnbThoa2MxZXNuN3VkcXY2ZW9qcTRpaCIsImp0aSI6ImU4NjhiYjVjLTM0YjMtNDBlOC1hYWRhLTY3ZmJmZGRhNjljMCIsImt1YmVybmV0ZXMuaW8iOnsibmFtZXNwYWNlIjoiZm9yY2V0MjItZGV2Iiwic2VydmljZWFjY291bnQiOnsibmFtZSI6ImNpY2QtZm9yY2V0IiwidWlkIjoiMmE1NDJiZWEtYTRhMi00NDFlLWJiMmYtNGE1OWNlZjQ1ZmY0In19LCJuYmYiOjE3NjEzNDEyNDIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpmb3JjZXQyMi1kZXY6Y2ljZC1mb3JjZXQifQ.pgkm3a-q1_sEmXsdp8PMwA_bujPXgF-n6ZRqfx0_1yBsFByQOq_dVRugPL0M3Oz3CwIGhhAnbUtvfB3Xb6-hnpOru5d_hScCc2d4b-wJgRGHT43v8SvP-t1mkoYXRJr3OgkOU6EYUAjvRrzizTElJqNQRfDQXRzpksRPYL3UNK6HbI9JAusOyV-uIHYsqJAXp0YPHYAYBjHE9eMm404j_0IW65UuwapZTwhn5fOcG8a4q5zx-QIFXvWJ614JhvzVu5aUOt5gTW2YvKCm_CLylvGRGPFC25abCJkeetqarL7hjQf92bbkDzkkHs9rgXwt9eS4OB5b7hvsaZP4xxcVvxF7jtA2KVhWf1a6mIPBX1SRe6cJqh2niBCRKFWU3PvOPsKYHeXk_TeYjkDjoexdhdXHqI60K_ufPYF7exxdR-l6zDZ4D8HXtS5yY63y25ISfONnsS7o-4_CfDbCwjp9HG4SqBhVtO8YAPPVS2psL4zCEBZOsWHM-7ImCGk7ggIM0d5-aSveXsJbfxWgMGxVqwbr01Giz_JFi7daOZ4lA5riCqq080o4g3vWvveJeSR-vVEnjtRPasQtztpzO3MkZPClaMPLG-O46LDv63iiaFMaeWYvyXg0QBoAaptJzOzGHSp7ir6xJTEugwKACKOequ5FUMaioA7RyesZTf-wBrU --server="https://api.rm1.0a51.p1.openshiftapps.com:6443"
+          oc login --token="$OPENSHIFT_TOKEN_STRIPPED" --server="https://api.rm2.thpm.p1.openshiftapps.com:6443"
           oc whoami
           oc whoami --show-user
           
       - name: Log in Openshift
         uses: redhat-actions/oc-login@v1
         with:
-          openshift_server_url: https://api.rm1.0a51.p1.openshiftapps.com:6443
+          openshift_server_url: https://api.rm2.thpm.p1.openshiftapps.com:6443
           openshift_token: ${{ env.OPENSHIFT_TOKEN_STRIPPED }} 
           namespace: forcet22-dev
 
