@@ -56,8 +56,6 @@ jobs:
         run: |
           oc version
           oc login --token="$OPENSHIFT_TOKEN_STRIPPED" --server="https://api.rm2.thpm.p1.openshiftapps.com:6443"
-          oc whoami
-          oc whoami --show-user
           
       - name: Log in Openshift
         uses: redhat-actions/oc-login@v1
