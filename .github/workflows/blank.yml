@@ -52,67 +52,10 @@ jobs:
           echo "::add-mask::$CLEAN_TOKEN"
           echo "Longitud saneada: ${#CLEAN_TOKEN}"
 
-      - name: Validar JWT (formato, exp, aud, sub) sin exponerlo
-        run: |
-          set -euo pipefail
-          python3 - "$OPENSHIFT_TOKEN_STRIPPED" <<- 'PY'
-            import sys, json, base64, time
-            tok = sys.argv[1]
-
-            parts = tok.split('.')
-            if len(parts) != 3:
-                print("ERROR: el token no tiene formato JWT (header.payload.signature)")
-                sys.exit(1)
-            h, p, s = parts
-
-            def b64url_decode(x: str) -> str:
-                x += "=" * (-len(x) % 4)
-                return base64.urlsafe_b64decode(x.encode()).decode("utf-8", "ignore")
-
-            try:
-                header  = json.loads(b64url_decode(h))
-                payload = json.loads(b64url_decode(p))
-            except Exception as e:
-                print("ERROR: no se pudo decodificar header/payload:", e)
-                sys.exit(1)
-
-            print("JWT header:", json.dumps(header, ensure_ascii=False, indent=2))
-            print("JWT payload:", json.dumps(payload, ensure_ascii=False, indent=2))
-
-            now = int(time.time())
-            exp = payload.get("exp")
-            if exp is not None:
-                left = exp - now
-                print(f"exp: {exp} (restan {left} s)")
-                if left <= 0:
-                    print("ERROR: token EXPIRADO")
-                    sys.exit(2)
-            else:
-                print("ADVERTENCIA: payload sin 'exp'")
-
-            aud = payload.get("aud")
-            ok_aud = False
-            if isinstance(aud, list):
-                ok_aud = ("openshift" in aud) or ("https://kubernetes.default.svc" in aud)
-            else:
-                ok_aud = aud in ("openshift", "https://kubernetes.default.svc")
-            print("aud válida?:", ok_aud, "| aud:", aud)
-
-            expected_ns = "forcet22-dev"
-            expected_sa = "cicd-forcet"
-            sub = payload.get("sub")
-            if sub != f"system:serviceaccount:{expected_ns}:{expected_sa}":
-                print("ADVERTENCIA: sub no coincide con SA/NS esperado:", sub)
-
-            # 6) Resultado “a priori”
-            if (exp is None or exp > now) and ok_aud:
-                print("JWT válido a priori (no expirado y con audiencia aceptable).")
-          PY
-
       - name: Probar oc login directo (debug)
         run: |
           oc version
-          oc login --token="$OPENSHIFT_TOKEN_STRIPPED" --server="https://api.rm1.0a51.p1.openshiftapps.com:6443"
+          oc login --token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ik44bmJtRDBQX3AwVG9JMm1rSVZBZUNScHdjbVRfUzM3cGR3RXJwZnFibjQifQ.eyJhdWQiOlsiaHR0cHM6Ly9vaWRjLm9wMS5vcGVuc2hpZnRhcHBzLmNvbS8yZmVnZ2V2bDRnbThoa2MxZXNuN3VkcXY2ZW9qcTRpaCJdLCJleHAiOjIwNzY3MDEyNDIsImlhdCI6MTc2MTM0MTI0MiwiaXNzIjoiaHR0cHM6Ly9vaWRjLm9wMS5vcGVuc2hpZnRhcHBzLmNvbS8yZmVnZ2V2bDRnbThoa2MxZXNuN3VkcXY2ZW9qcTRpaCIsImp0aSI6ImU4NjhiYjVjLTM0YjMtNDBlOC1hYWRhLTY3ZmJmZGRhNjljMCIsImt1YmVybmV0ZXMuaW8iOnsibmFtZXNwYWNlIjoiZm9yY2V0MjItZGV2Iiwic2VydmljZWFjY291bnQiOnsibmFtZSI6ImNpY2QtZm9yY2V0IiwidWlkIjoiMmE1NDJiZWEtYTRhMi00NDFlLWJiMmYtNGE1OWNlZjQ1ZmY0In19LCJuYmYiOjE3NjEzNDEyNDIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpmb3JjZXQyMi1kZXY6Y2ljZC1mb3JjZXQifQ.pgkm3a-q1_sEmXsdp8PMwA_bujPXgF-n6ZRqfx0_1yBsFByQOq_dVRugPL0M3Oz3CwIGhhAnbUtvfB3Xb6-hnpOru5d_hScCc2d4b-wJgRGHT43v8SvP-t1mkoYXRJr3OgkOU6EYUAjvRrzizTElJqNQRfDQXRzpksRPYL3UNK6HbI9JAusOyV-uIHYsqJAXp0YPHYAYBjHE9eMm404j_0IW65UuwapZTwhn5fOcG8a4q5zx-QIFXvWJ614JhvzVu5aUOt5gTW2YvKCm_CLylvGRGPFC25abCJkeetqarL7hjQf92bbkDzkkHs9rgXwt9eS4OB5b7hvsaZP4xxcVvxF7jtA2KVhWf1a6mIPBX1SRe6cJqh2niBCRKFWU3PvOPsKYHeXk_TeYjkDjoexdhdXHqI60K_ufPYF7exxdR-l6zDZ4D8HXtS5yY63y25ISfONnsS7o-4_CfDbCwjp9HG4SqBhVtO8YAPPVS2psL4zCEBZOsWHM-7ImCGk7ggIM0d5-aSveXsJbfxWgMGxVqwbr01Giz_JFi7daOZ4lA5riCqq080o4g3vWvveJeSR-vVEnjtRPasQtztpzO3MkZPClaMPLG-O46LDv63iiaFMaeWYvyXg0QBoAaptJzOzGHSp7ir6xJTEugwKACKOequ5FUMaioA7RyesZTf-wBrU --server="https://api.rm1.0a51.p1.openshiftapps.com:6443"
           oc whoami
           oc whoami --show-user
           
