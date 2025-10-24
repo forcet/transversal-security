@@ -52,6 +52,47 @@ jobs:
           echo "::add-mask::$CLEAN_TOKEN"
           echo "Longitud saneada: ${#CLEAN_TOKEN}"
 
+      - name: Inspeccionar JWT (sin exponer token)
+        shell: bash
+        run: |
+          set -euo pipefail
+          tok="$OPENSHIFT_TOKEN_STRIPPED"
+          if [[ "$tok" != *.*.* ]]; then
+            echo "ERROR: El token no tiene formato JWT (header.payload.signature). ¿pegaste un token viejo/base64?"
+            exit 1
+          fi
+          IFS='.' read -r H P S <<< "$tok"
+          decode() { python - << 'PY'
+      import sys,base64,json,time
+      d=sys.stdin.read().strip().replace('-','+').replace('_','/')
+      pad='='*((4-len(d)%4)%4)
+      try:
+        j=json.loads(base64.b64decode(d+pad).decode('utf-8','ignore'))
+        print(json.dumps(j, indent=2, ensure_ascii=False))
+      except Exception as e:
+        print("<<no se pudo decodificar>>")
+      PY
+      }
+          echo "JWT header:";   printf '%s' "$H" | decode
+          echo "JWT payload:";  printf '%s' "$P" | decode | tee payload.json
+          # Extra: mostrar aud/exp/sub y cuánto falta para expirar
+          AUD=$(jq -r '.aud // empty' payload.json || true)
+          SUB=$(jq -r '.sub // empty' payload.json || true)
+          EXP=$(jq -r '.exp // empty' payload.json || true)
+          NOW=$(date +%s)
+          if [[ -n "$EXP" ]]; then
+            LEFT=$(( EXP - NOW ))
+            echo "exp: $EXP (faltan ${LEFT}s)"
+            if (( LEFT <= 0 )); then
+              echo "ERROR: El token está EXPIRADO."
+              exit 1
+            fi
+          else
+            echo "ADVERTENCIA: payload sin 'exp'"
+          fi
+          echo "aud: ${AUD:-<vacío>}"
+          echo "sub: ${SUB:-<vacío>}"
+
       - name: Probar oc login directo (debug)
         run: |
           oc version
